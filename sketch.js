@@ -89,13 +89,13 @@ function setup() {
   // default contains 16 values between 0 and 1. Each value or
   // 'tick' is 1/16th of a bar, 4 ticks make a beat.
 
-  click = new StepSeqTrack("click", [], [], buttons[0]);
-  beep = new StepSeqTrack("beep", [], [], buttons[1]);
-  amen00 = new StepSeqTrack("amen00", [], [], buttons[2]);
-  amen01 = new StepSeqTrack("amen01", [], [], buttons[3]);
-  amen02 = new StepSeqTrack("amen02", [], [], buttons[4]);
-  amen03 = new StepSeqTrack("amen03", [], [], buttons[5]);
-  hat = new StepSeqTrack("hat", [], [], buttons[6]);
+  click = new StepSeqTrack("click", buttons[0]);
+  beep = new StepSeqTrack("beep", buttons[1]);
+  amen00 = new StepSeqTrack("amen00", buttons[2]);
+  amen01 = new StepSeqTrack("amen01", buttons[3]);
+  amen02 = new StepSeqTrack("amen02", buttons[4]);
+  amen03 = new StepSeqTrack("amen03", buttons[5]);
+  hat = new StepSeqTrack("hat", buttons[6]);
 
   tracks.push(click);
   tracks.push(beep);
@@ -162,14 +162,18 @@ function play(time) {
 
   for (var track of tracks) {
     if (track.isPlaying) {
-      console.log(track.eventPattern);
-      if (track.eventPattern[playhead] > 0) {
-        track.player.stop(time); // legato
-        console.log(track.controlPatterns[0]);
-        for (cp of track.controlPatterns) {
-          switch (cp.type) {
+      console.log(track.pattern[0].type);
+      if (track.pattern[0].pattern[playhead] > 0) {
+        // track.player.stop(time); //legato
+        for (pattern of track.pattern) {
+          switch (pattern.type) {
             case "speed":
-              track.player.playbackRate = cp.pattern[playhead];
+              if (
+                pattern.pattern[playhead] != null &&
+                pattern.pattern[playhead] != 0
+              ) {
+                track.player.playbackRate = pattern.pattern[playhead];
+              }
               break;
             default:
               break;
@@ -292,5 +296,5 @@ function mouseDragged() {
 
 function updatePattern(v, i) {
   console.log(v, `i: ${i}`);
-  tracks[i].updateEventPattern(["event", v]);
+  tracks[i].updatePattern(v);
 }

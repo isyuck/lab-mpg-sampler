@@ -1,23 +1,6 @@
 class StepSeqTrack {
-  name = "";
-  eventPattern;
-  controlPatterns;
-  button;
-  isPlaying = false;
-  constructor(name, eventPattern, controlPatterns, button) {
+  constructor(name, button) {
     this.name = name;
-    if (eventPattern.length === 0) {
-      this.eventPattern = [0];
-    } else {
-      this.eventPattern = this.parseEventPattern(eventPattern);
-    }
-
-    if (controlPatterns.length === 0) {
-      this.controlPatterns = [];
-    } else {
-      this.controlPatterns = this.parseControlPatterns(controlPatterns);
-    }
-
     this.button = button;
     this.isPlaying = false;
 
@@ -29,27 +12,25 @@ class StepSeqTrack {
       this.isPlaying = playback;
     };
   }
-  updateEventPattern(p) {
-    this.eventPattern = this.parseGenericPattern(p[1]);
+  updatePattern(p) {
+    this.pattern = this.parsePattern(p);
   }
-  parseEventPattern(p) {
-    console.log(p);
-    return this.parseGenericPattern(p[1]);
-  }
-  parseControlPatterns(ps) {
-    console.log(ps);
-    return ps.map((p) => ({
-      type: p[0],
-      pattern: this.parseGenericPattern(p[1]),
+
+  parsePattern(p) {
+    let pats = p.split("+");
+    pats = pats.map((x) => x.split('"'));
+    pats = pats.map((x) => ({
+      type: x[0].replaceAll(" ", ""),
+      pattern: x[1].split(" "),
     }));
-  }
-  parseGenericPattern(pat) {
-    let inPat = pat.split(" ").map((x) => parseFloat(x));
-    let outPat = new Array(16).fill(0);
-    for (const [i, pat] of inPat.entries()) {
-      outPat[round(map(i, 0, inPat.length, 0, 16))] = pat;
+    for (var pat of pats) {
+      let out = new Array(16).fill(0);
+      for (var [i, e] of pat.pattern.entries()) {
+        out[round(map(i, 0, pat.pattern.length, 0, out.length))] = e;
+      }
+      pat.pattern = out;
     }
-    return outPat;
+    return pats;
   }
 }
 

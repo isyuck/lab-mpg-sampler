@@ -1,8 +1,8 @@
 // GUI variables.
 var logoFont;
+var readableFont;
 var buttons = [];
 var sliders = [];
-var inputs;
 
 // Sound variables.
 var bpm = 137;
@@ -19,19 +19,12 @@ var clock;
 var playhead = -1;
 
 // Global effects.
+var hpf, lpf;
 
 // Main output volume control.
 var mainOut;
 
-// Tracks variables.
-var click;
-var beep;
-var amen00;
-var amen01;
-var amen02;
-var amen03;
-var hat;
-
+// all the tracks
 var tracks;
 
 // -----------------------------------------------------------------------------
@@ -41,6 +34,7 @@ var tracks;
 // Load images and fonts here.
 function preload() {
   logoFont = loadFont("assets/spaceage.otf");
+  readableFont = loadFont("assets/hack.ttf");
 }
 
 function setup() {
@@ -53,28 +47,13 @@ function setup() {
     for (let x = 0; x < 3; x++) {
       buttons.push(
         new Button(
-          300 + x * 120, // x position
-          200 + y * 120, // y position
-          100
-        ) // button size
+          400 + x * 240, // x position
+          200 + y * 240, // y position
+          200 // size
+        )
       );
     }
   }
-
-  inputs = new Array();
-  push();
-  translate(600, 75);
-  for (let i = 0; i < 9; i++) {
-    let input = createInput();
-    var x = 0;
-    var y = i * 25;
-    input.position(x, y);
-    input.size(200);
-    input.elt.addEventListener("input", function () {
-      updatePattern(input.value(), i);
-    });
-  }
-  pop();
 
   // Create sliders
   for (let i = 0; i < 3; i++) {
@@ -84,26 +63,97 @@ function setup() {
   // Set slider default values and callback functions.
   sliders[0].value = 1;
   sliders[0].onSlide = slider_0_Moved;
+  sliders[1].value = 1;
+  sliders[1].onSlide = slider_1_Moved;
+  sliders[2].value = 1;
+  sliders[2].onSlide = slider_2_Moved;
 
-  // Create tracks. Each track contains a pattern array, which by
-  // default contains 16 values between 0 and 1. Each value or
-  // 'tick' is 1/16th of a bar, 4 ticks make a beat.
+  // create each track
+  // constructor args are
+  // name
+  // button ref
+  // sample src
+  // starting pattern
+  tracks.push(
+    new StepSeqTrack(
+      "click",
+      buttons[0],
+      "assets/click.mp3",
+      'struct "1 1" + speed "1 0.5"'
+    )
+  );
 
-  click = new StepSeqTrack("click", buttons[0]);
-  beep = new StepSeqTrack("beep", buttons[1]);
-  amen00 = new StepSeqTrack("amen00", buttons[2]);
-  amen01 = new StepSeqTrack("amen01", buttons[3]);
-  amen02 = new StepSeqTrack("amen02", buttons[4]);
-  amen03 = new StepSeqTrack("amen03", buttons[5]);
-  hat = new StepSeqTrack("hat", buttons[6]);
+  tracks.push(
+    new StepSeqTrack(
+      "beep",
+      buttons[1],
+      "assets/beep.mp3",
+      'struct "1 1 1 0 1 1 1 0 1 1 1 0 1 1 1 0 " + speed "0.5 0.55 0.45 0.5" + hpf "3000"'
+    )
+  );
 
-  tracks.push(click);
-  tracks.push(beep);
-  tracks.push(amen00);
-  tracks.push(amen01);
-  tracks.push(amen02);
-  tracks.push(amen03);
-  tracks.push(hat);
+  tracks.push(
+    new StepSeqTrack(
+      "amen00",
+      buttons[2],
+      "assets/amen/amen00.wav",
+      'struct "1 1 1 1" + hpf "0 500 1000 1500" + speed "1 0.5 2 1.5"'
+    )
+  );
+
+  tracks.push(
+    new StepSeqTrack(
+      "amen01",
+      buttons[3],
+      "assets/amen/amen01.wav",
+      'struct "0 1 0 0" + lpf "1000"'
+    )
+  );
+
+  tracks.push(
+    new StepSeqTrack(
+      "amen02",
+      buttons[4],
+      "assets/amen/amen02.wav",
+      'struct "0 0 1 0 0" + speed "0.5"'
+    )
+  );
+
+  tracks.push(
+    new StepSeqTrack(
+      "amen03",
+      buttons[5],
+      "assets/amen/amen03.wav",
+      'struct "0 0 0 0 1 1 0 1" + speed "2" + hpf "5000"'
+    )
+  );
+
+  tracks.push(
+    new StepSeqTrack(
+      "hat",
+      buttons[6],
+      "assets/hihat.mp3",
+      'struct "1 1 1 1 0 0 0 0 1 1 1 1 0 0 0 0" + hpf "5000 8000 10000 13000"'
+    )
+  );
+
+  tracks.push(
+    new StepSeqTrack(
+      "808bd",
+      buttons[7],
+      "assets/808bd.wav",
+      'struct "1 1 0 1 0 0 1 0"'
+    )
+  );
+
+  tracks.push(
+    new StepSeqTrack(
+      "show",
+      buttons[8],
+      "assets/show.wav",
+      'struct "0 1 0 0 1 1 0 0" + speed "1 1.5" + hpf "500 1000"'
+    )
+  );
 }
 
 async function startAudio() {
@@ -117,6 +167,9 @@ async function startAudio() {
   console.log("Audio has started.");
 
   mainOut = new Tone.Volume(0);
+  hpf = new Tone.Filter(0, "highpass");
+  lpf = new Tone.Filter(40000, "lowpass");
+  mainOut.chain(hpf, lpf, Tone.Destination);
 
   // Create our own sequencer.
   // We will use this clock, which runs in the audio thread, as a
@@ -127,26 +180,11 @@ async function startAudio() {
   clock = new Tone.Clock(play, (bpm / 60) * 4);
   clock.start();
 
-  // Create audio sample players and load audio samples.
-  click.player = new Tone.Player("assets/click.mp3");
-  beep.player = new Tone.Player("assets/beep.mp3");
-  amen00.player = new Tone.Player("assets/amen/amen00.wav");
-  amen01.player = new Tone.Player("assets/amen/amen01.wav");
-  amen02.player = new Tone.Player("assets/amen/amen02.wav");
-  amen03.player = new Tone.Player("assets/amen/amen03.wav");
-  hat.player = new Tone.Player("assets/hihat.mp3");
-  click.player.connect(mainOut);
-  beep.player.connect(mainOut);
-  amen00.player.connect(mainOut);
-  amen01.player.connect(mainOut);
-  amen02.player.connect(mainOut);
-  amen03.player.connect(mainOut);
-  hat.player.connect(mainOut);
-  mainOut.toDestination();
-
-  // Wait until all samples are loaded.
-  await Tone.loaded();
-  console.log("All samples loaded");
+  // initialise each track
+  for (var track of tracks) {
+    await track.init(mainOut);
+  }
+  // connect mainout
 
   audioInitialised = true;
   audioStarting = false;
@@ -160,28 +198,9 @@ function play(time) {
     playhead = 0;
   }
 
+  // run each tracks play function
   for (var track of tracks) {
-    if (track.isPlaying) {
-      console.log(track.pattern[0].type);
-      if (track.pattern[0].pattern[playhead] > 0) {
-        // track.player.stop(time); //legato
-        for (pattern of track.pattern) {
-          switch (pattern.type) {
-            case "speed":
-              if (
-                pattern.pattern[playhead] != null &&
-                pattern.pattern[playhead] != 0
-              ) {
-                track.player.playbackRate = pattern.pattern[playhead];
-              }
-              break;
-            default:
-              break;
-          }
-        }
-        track.player.start(time);
-      }
-    }
+    track.play(time, playhead);
   }
 }
 
@@ -220,25 +239,39 @@ function draw() {
   textFont(logoFont);
   textSize(70);
   text("MPG", 10, 80);
+  textFont(readableFont);
+  textSize(20);
+  text("with patterns", 13, 150);
+  textFont(logoFont);
 
-  // Visualise playback position.
-
+  // draw all of the buttons
   for (let i = 0; i < buttons.length; i++) {
     buttons[i].draw();
   }
+  textFont(readableFont);
+  textSize(20);
+  push();
+  translate(80, 500);
+  rotate(radians(270));
+  text("vol", 0, 0);
+  text("lpf", 0, 60);
+  text("hpf", 0, 120);
+  pop();
 
+  // draw the main sliders
   for (let i = 0; i < sliders.length; i++) {
     sliders[i].draw();
   }
 
-  translate(40, 600);
+  // Visualise playback position.
+  translate(40, 810);
   for (var i = 0; i < numSteps; i++) {
     var x = i * 40;
-    var c = i == playhead ? color(0, 255, 0) : color(255);
-    fill(c);
-    x *= 1.2;
-    rect(x, 0, 40, 40);
-    text(i + 1, x + 20, 60);
+    // fill current step green, others white
+    fill(i == playhead ? color(0, 255, 0) : color(255));
+    x *= 1.2; // pad
+    rect(x, 0, 40, 40); // draw step
+    text(i + 1, x + 20, 60); // draw step number
   }
 }
 
@@ -248,6 +281,12 @@ function draw() {
 
 function slider_0_Moved() {
   mainOut.volume.value = ampToDb(sliders[0].value);
+}
+function slider_1_Moved() {
+  lpf.frequency.rampTo(sliders[1].value * 10000, 0);
+}
+function slider_2_Moved() {
+  hpf.frequency.rampTo((1 - sliders[2].value) * 20000, 0);
 }
 
 // -----------------------------------------------------------------------------
@@ -262,27 +301,18 @@ function keyPressed() {
   }
 }
 
-// Mouse events
-
-function mousePressed() {
-  if (!audioInitialised) {
-    // Disable mouse controls until audio samples are loaded.
-    return;
-  }
-
-  // Work out if a button has been pressed.
-  for (let i = 0; i < buttons.length; i++) {
-    if (buttons[i].isInside(mouseX, mouseY)) {
-      buttons[i].press();
-      break;
-    }
-  }
-}
-
 function mouseDragged() {
   if (!audioInitialised) {
     // Disable mouse controls until audio samples are loaded.
     return;
+  }
+
+  // slide individual volume sliders in each track, if necessary
+  for (var track of tracks) {
+    if (track.button.slider.isInside(mouseX, mouseY)) {
+      track.button.slider.slide(mouseY);
+      break;
+    }
   }
 
   // Work out if a slider has been moved.
@@ -292,9 +322,4 @@ function mouseDragged() {
       break;
     }
   }
-}
-
-function updatePattern(v, i) {
-  console.log(v, `i: ${i}`);
-  tracks[i].updatePattern(v);
 }
